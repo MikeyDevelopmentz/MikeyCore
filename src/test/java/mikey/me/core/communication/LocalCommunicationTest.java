@@ -294,4 +294,35 @@ class LocalCommunicationTest {
         assertFalse(communication.isStarted());
         assertFalse(communication.isClosed());
     }
+
+    @Test
+    void closingTheLastListenerCannotLoseANewSubscription() throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < 2_000; i++) {
+                LocalCommunication bus = new LocalCommunication();
+                EventSubscription old = bus.subscribe("chat", event -> {});
+                AtomicInteger deliveries = new AtomicInteger();
+                CountDownLatch start = new CountDownLatch(1);
+                var close = executor.submit(() -> {
+                    start.await();
+                    old.close();
+                    return null;
+                });
+                var subscribe = executor.submit(() -> {
+                    start.await();
+                    return bus.subscribe("chat", event -> deliveries.incrementAndGet());
+                });
+                start.countDown();
+                close.get(10, TimeUnit.SECONDS);
+                EventSubscription current = subscribe.get(10, TimeUnit.SECONDS);
+                assertTrue(current.isActive());
+                bus.publish("chat", "test");
+                assertEquals(1, deliveries.get(), "lost listener on iteration " + i);
+                bus.close();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
 }

@@ -27,17 +27,22 @@ public final class JsonUtil {
     }
 
     public static String extractString(String json, String key) {
-        if (json == null || key == null) return "";
-        String search = "\"" + key + "\":\"";
-        int start = json.indexOf(search);
+        int start = findValueStart(json, key);
         if (start < 0) return "";
-        start += search.length();
+        JsonString value = readString(json, start);
+        return value != null && hasValueBoundary(json, value.end()) ? value.value() : "";
+    }
+
+    private static JsonString readString(String json, int start) {
+        if (start >= json.length() || json.charAt(start) != '"') return null;
         StringBuilder sb = new StringBuilder();
         boolean escape = false;
-        for (int i = start; i < json.length(); i++) {
+        for (int i = start + 1; i < json.length(); i++) {
             char c = json.charAt(i);
             if (escape) {
                 switch (c) {
+                    case 'b':  sb.append('\b'); break;
+                    case 'f':  sb.append('\f'); break;
                     case 'n':  sb.append('\n'); break;
                     case 'r':  sb.append('\r'); break;
                     case 't':  sb.append('\t'); break;
@@ -49,44 +54,41 @@ public final class JsonUtil {
                             try {
                                 sb.append((char) Integer.parseInt(json.substring(i + 1, i + 5), 16));
                                 i += 4;
-                            } catch (NumberFormatException ignored) {}
+                            } catch (NumberFormatException ignored) { return null; }
+                        } else {
+                            return null;
                         }
                         break;
-                    default:  sb.append(c);
+                    default:  return null;
                 }
                 escape = false;
             } else if (c == '\\') {
                 escape = true;
             } else if (c == '"') {
-                return sb.toString();
+                return new JsonString(sb.toString(), i + 1);
             } else {
+                if (c < 0x20) return null;
                 sb.append(c);
             }
         }
-        return sb.toString();
+        return null;
     }
 
     public static boolean extractBool(String json, String key, boolean def) {
-        if (json == null || key == null) return def;
-        String search = "\"" + key + "\":";
-        int start = json.indexOf(search);
+        int start = findValueStart(json, key);
         if (start < 0) return def;
-        start += search.length();
         if (json.regionMatches(start, "true", 0, 4) && hasValueBoundary(json, start + 4)) return true;
         if (json.regionMatches(start, "false", 0, 5) && hasValueBoundary(json, start + 5)) return false;
         return def;
     }
 
     public static boolean hasKey(String json, String key) {
-        return json != null && key != null && json.indexOf("\"" + key + "\":") >= 0;
+        return findValueStart(json, key) >= 0;
     }
 
     public static long extractLong(String json, String key, long def) {
-        if (json == null || key == null) return def;
-        String search = "\"" + key + "\":";
-        int start = json.indexOf(search);
+        int start = findValueStart(json, key);
         if (start < 0) return def;
-        start += search.length();
         if (start >= json.length()) return def;
         int end = start;
         if (json.charAt(end) == '-') end++;
@@ -102,6 +104,43 @@ public final class JsonUtil {
         if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) return def;
         return (int) value;
     }
+
+    private static int findValueStart(String json, String key) {
+        if (json == null || key == null) return -1;
+        int start = skipWhitespace(json, 0);
+        if (start >= json.length() || json.charAt(start) != '{') return -1;
+        int depth = 1;
+        for (int i = start + 1; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '"') {
+                JsonString string = readString(json, i);
+                if (string == null) return -1;
+                int next = skipWhitespace(json, string.end());
+                if (depth == 1 && string.value().equals(key)
+                        && next < json.length() && json.charAt(next) == ':') {
+                    int value = skipWhitespace(json, next + 1);
+                    return value < json.length() ? value : -1;
+                }
+                i = string.end() - 1;
+            } else if (c == '{' || c == '[') {
+                depth++;
+            } else if (c == '}' || c == ']') {
+                if (--depth == 0) return -1;
+            }
+        }
+        return -1;
+    }
+
+    private static int skipWhitespace(String json, int start) {
+        while (start < json.length()) {
+            char c = json.charAt(start);
+            if (c != ' ' && c != '\t' && c != '\n' && c != '\r') break;
+            start++;
+        }
+        return start;
+    }
+
+    private record JsonString(String value, int end) {}
 
     private static boolean hasValueBoundary(String value, int end) {
         int index = end;

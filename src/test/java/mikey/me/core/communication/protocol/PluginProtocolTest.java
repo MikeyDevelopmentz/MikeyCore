@@ -35,4 +35,15 @@ class PluginProtocolTest {
         assertTrue(PluginProtocol.unwrap(PluginProtocol.CH_VANISH, envelope, SECRET).isEmpty());
         assertTrue(PluginProtocol.wrap(PluginProtocol.CH_VANISH, PAYLOAD, "").isEmpty());
     }
+
+    @Test
+    void readsSpacedEnvelopeWithoutChangingTheSignedPayload() {
+        String envelope = PluginProtocol.wrap(PluginProtocol.CH_STAFFCHAT, PAYLOAD, SECRET).orElseThrow();
+        String spaced = envelope.replace("\"timestamp\":", "\"timestamp\" : ")
+                .replace("\"nonce\":", "\"nonce\" : ")
+                .replace("\"payload\":", "\"payload\" : ")
+                .replace("\"mac\":", "\"mac\" : ");
+        assertEquals(PAYLOAD, PluginProtocol.unwrap(PluginProtocol.CH_STAFFCHAT, spaced, SECRET).orElseThrow());
+        assertTrue(PluginProtocol.unwrap(PluginProtocol.CH_STAFFCHAT, spaced, SECRET).isEmpty());
+    }
 }

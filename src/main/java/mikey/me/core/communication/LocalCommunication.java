@@ -33,8 +33,13 @@ public final class LocalCommunication implements CommunicationApi {
         if (closed.get()) {
             return new Subscription(key, listener, false);
         }
-        subscribers.computeIfAbsent(key, ignored -> new CopyOnWriteArrayList<>()).add(listener);
-        return new Subscription(key, listener, true);
+        subscribers.compute(key, (ignored, listeners) -> {
+            if (closed.get()) return listeners;
+            if (listeners == null) listeners = new CopyOnWriteArrayList<>();
+            listeners.add(listener);
+            return listeners;
+        });
+        return new Subscription(key, listener, !closed.get());
     }
 
     @Override
@@ -102,13 +107,10 @@ public final class LocalCommunication implements CommunicationApi {
         @Override
         public void close() {
             if (active.compareAndSet(true, false)) {
-                CopyOnWriteArrayList<Consumer<CommunicationEvent>> listeners = subscribers.get(channel);
-                if (listeners != null) {
+                subscribers.computeIfPresent(channel, (ignored, listeners) -> {
                     listeners.remove(listener);
-                    if (listeners.isEmpty()) {
-                        subscribers.remove(channel, listeners);
-                    }
-                }
+                    return listeners.isEmpty() ? null : listeners;
+                });
             }
         }
 
