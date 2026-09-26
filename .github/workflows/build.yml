@@ -19,3 +19,25 @@ jobs:
           distribution: 'temurin'
       - name: Build
         run: ./gradlew build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mikey-core-jar
+          path: build/libs/*.jar
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mikey-core-jar
+      # replaces the old latest release every push
+      - name: Update latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes -R ${{ github.repository }} || true
+          gh release create latest *.jar -R ${{ github.repository }} --target ${{ github.sha }} --title "latest build" --notes "auto build from ${{ github.sha }}"
