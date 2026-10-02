@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class YamlFileTest {
@@ -166,6 +167,43 @@ class YamlFileTest {
         boolean allA = back.keySet().stream().allMatch(k -> k.startsWith("a"));
         boolean allB = back.keySet().stream().allMatch(k -> k.startsWith("b"));
         assertTrue(allA || allB, "file must contain one writer's content, not a splice of both");
+    }
+
+    @Test
+    void roundTripsNewlinesInsideScalars() throws Exception {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("text", "one\ntwo");
+        root.put("quote", "say \"hi\"\r\nnext");
+        Path file = dir.resolve("nl.yml");
+        YamlFile.write(file, root);
+        String raw = Files.readString(file);
+        assertTrue(raw.contains("\\n"), raw);
+        assertFalse(raw.contains("one\ntwo"), raw);
+        Map<String, Object> back = YamlFile.read(file);
+        assertEquals("one\ntwo", back.get("text"));
+        assertEquals("say \"hi\"\r\nnext", back.get("quote"));
+    }
+
+    @Test
+    void readsHandWrittenBoolWords() throws Exception {
+        Path file = dir.resolve("bools.yml");
+        Files.writeString(file, """
+                a: yes
+                b: no
+                c: on
+                d: off
+                e: true
+                f: FALSE
+                g: maybe
+                """);
+        Map<String, Object> back = YamlFile.read(file);
+        assertTrue(YamlFile.bool(back, "a", false));
+        assertFalse(YamlFile.bool(back, "b", true));
+        assertTrue(YamlFile.bool(back, "c", false));
+        assertFalse(YamlFile.bool(back, "d", true));
+        assertTrue(YamlFile.bool(back, "e", false));
+        assertFalse(YamlFile.bool(back, "f", true));
+        assertFalse(YamlFile.bool(back, "g", false));
     }
 
     private static void writeQuietly(Path file, Map<String, Object> content) {

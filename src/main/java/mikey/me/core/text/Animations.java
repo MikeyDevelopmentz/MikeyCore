@@ -121,14 +121,16 @@ public final class Animations {
                 i++;
                 continue;
             }
-            char c = inner.charAt(i);
-            if (c == '\n') {
+            int codePoint = inner.codePointAt(i);
+            if (codePoint == '\n') {
                 out.append('\n');
+                i += Character.charCount(codePoint) - 1;
                 continue;
             }
             boolean hot = wave ? index == mark || index == Math.floorMod(mark + 1, visible) : index < mark;
-            out.append(amp(hot ? colors[1] : colors[0])).append(c);
+            out.append(amp(hot ? colors[1] : colors[0])).appendCodePoint(codePoint);
             index++;
+            i += Character.charCount(codePoint) - 1;
         }
         return out.toString();
     }

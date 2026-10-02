@@ -14,6 +14,14 @@ class DatabaseConfigTest {
 
         assertTrue(config.toString().contains("password=***"));
         assertFalse(config.toString().contains("secret"));
+
+        DatabaseConfig withUrl = new DatabaseConfig(
+                "jdbc:mysql://dbuser:secret@localhost/db?password=secret&useSsl=false",
+                "user", "secret", 4, "pool");
+        String text = withUrl.toString();
+        assertTrue(text.contains("password=***"));
+        assertTrue(text.contains("dbuser:***@"));
+        assertFalse(text.contains("secret"), text);
     }
 
     @Test

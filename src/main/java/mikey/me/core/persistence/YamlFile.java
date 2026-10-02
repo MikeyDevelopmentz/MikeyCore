@@ -91,7 +91,17 @@ public final class YamlFile {
 
     public static boolean bool(Map<String, Object> map, String key, boolean fallback) {
         Object value = map == null ? null : map.get(key);
-        return value instanceof Boolean flag ? flag : fallback;
+        if (value instanceof Boolean flag) {
+            return flag;
+        }
+        // hand written yes/on/true, parser usually boxes these but a raw string should too
+        if (value instanceof String text) {
+            Boolean word = boolWord(text);
+            if (word != null) {
+                return word;
+            }
+        }
+        return fallback;
     }
 
     public static List<String> strings(Map<String, Object> map, String key) {
@@ -204,9 +214,26 @@ public final class YamlFile {
         return quote(String.valueOf(value));
     }
 
+    // yaml 1.1 bool words this parser already treats as reserved, not y/n
+    private static Boolean boolWord(String text) {
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        return switch (lower) {
+            case "true", "yes", "on" -> true;
+            case "false", "no", "off" -> false;
+            default -> null;
+        };
+    }
+
     private static String quote(String text) {
         if (plain(text)) {
             return text;
+        }
+        // single quotes keep a real newline, the line parser then splits the scalar
+        if (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) {
+            return "\"" + text.replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\r", "\\r")
+                    .replace("\n", "\\n") + "\"";
         }
         return "'" + text.replace("'", "''") + "'";
     }

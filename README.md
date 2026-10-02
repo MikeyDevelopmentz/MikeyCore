@@ -28,10 +28,10 @@ includeBuild("../MikeyCore") {
 }
 ```
 
-then depend on it and shade it into the plugin jar:
+then depend on it with compileOnly, dont shade it:
 
 ```kotlin
-implementation("mikey.core:mikey-core:0.1.0-SNAPSHOT")
+compileOnly("mikey.core:mikey-core:0.1.0-SNAPSHOT")
 ```
 
 gradle swaps in the local build for that coordinate so changes here show up without publishing.

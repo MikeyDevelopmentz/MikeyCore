@@ -111,18 +111,35 @@ public final class PluginProtocol {
         }
     }
 
+    // tests only. cache is static, a flood would block the next case for the whole window
+    static void clearSeenNonces() {
+        SEEN_NONCES.clear();
+        NONCE_ORDER.clear();
+        LAST_SWEEP = 0L;
+    }
+
     private static boolean rememberNonce(String nonce, long timestamp) {
         if (SEEN_NONCES.containsKey(nonce)) {
             return false;
         }
         expireOldNonces();
-        // at capacity evict the oldest, refusing the new one silently drops traffic
+        // only drop nonces already outside the window. kicking a live one lets a replay through
+        long cutoff = System.currentTimeMillis() - MAX_MESSAGE_AGE_MILLIS;
         while (SEEN_NONCES.size() >= MAX_CACHED_NONCES) {
-            String oldest = NONCE_ORDER.poll();
+            String oldest = NONCE_ORDER.peek();
             if (oldest == null) {
                 break;
             }
-            SEEN_NONCES.remove(oldest);
+            Long seenAt = SEEN_NONCES.get(oldest);
+            if (seenAt == null) {
+                NONCE_ORDER.poll();
+                continue;
+            }
+            if (seenAt >= cutoff) {
+                return false;
+            }
+            NONCE_ORDER.poll();
+            SEEN_NONCES.remove(oldest, seenAt);
         }
         if (SEEN_NONCES.putIfAbsent(nonce, timestamp) != null) {
             return false;

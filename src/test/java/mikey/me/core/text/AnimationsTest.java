@@ -33,4 +33,11 @@ class AnimationsTest {
         assertTrue(frame.contains("<#FFFFFF>"));
         assertTrue(frame.contains("<#FF5555>"));
     }
+
+    @Test
+    void waveKeepsSurrogatePairsTogether() {
+        String emoji = "\uD83D\uDE00";
+        String frame = Animations.frame("<#ANIM:wave:&f,&c>" + emoji + "a</#ANIM>", 0);
+        assertTrue(frame.contains(emoji), frame);
+    }
 }
