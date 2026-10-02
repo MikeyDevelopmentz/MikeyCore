@@ -33,8 +33,13 @@ public final class PluginProtocol {
             CH_MUTE, CH_VANISH, CH_FREEZE, CH_PLAYER_LIST);
 
     private static final int MAX_CACHED_NONCES = 8192;
+    private static final long NONCE_SWEEP_INTERVAL_MILLIS = 1_000L;
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Map<String, Long> SEEN_NONCES = new ConcurrentHashMap<>();
+    // insertion order so capacity eviction can drop the oldest without scanning the map
+    private static final java.util.concurrent.ConcurrentLinkedQueue<String> NONCE_ORDER =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private static volatile long LAST_SWEEP;
 
     private PluginProtocol() {}
 
@@ -107,10 +112,39 @@ public final class PluginProtocol {
     }
 
     private static boolean rememberNonce(String nonce, long timestamp) {
-        long cutoff = System.currentTimeMillis() - MAX_MESSAGE_AGE_MILLIS;
-        SEEN_NONCES.entrySet().removeIf(entry -> entry.getValue() < cutoff);
-        // cache full = drop new msgs, better than letting replays through
-        if (SEEN_NONCES.size() >= MAX_CACHED_NONCES && !SEEN_NONCES.containsKey(nonce)) return false;
-        return SEEN_NONCES.putIfAbsent(nonce, timestamp) == null;
+        if (SEEN_NONCES.containsKey(nonce)) {
+            return false;
+        }
+        expireOldNonces();
+        // at capacity evict the oldest, refusing the new one silently drops traffic
+        while (SEEN_NONCES.size() >= MAX_CACHED_NONCES) {
+            String oldest = NONCE_ORDER.poll();
+            if (oldest == null) {
+                break;
+            }
+            SEEN_NONCES.remove(oldest);
+        }
+        if (SEEN_NONCES.putIfAbsent(nonce, timestamp) != null) {
+            return false;
+        }
+        NONCE_ORDER.add(nonce);
+        return true;
+    }
+
+    // sweep expired nonces but at most once per interval, a full scan per message was too slow
+    private static void expireOldNonces() {
+        long now = System.currentTimeMillis();
+        if (now - LAST_SWEEP < NONCE_SWEEP_INTERVAL_MILLIS) {
+            return;
+        }
+        LAST_SWEEP = now;
+        long cutoff = now - MAX_MESSAGE_AGE_MILLIS;
+        for (Map.Entry<String, Long> entry : SEEN_NONCES.entrySet()) {
+            if (entry.getValue() < cutoff) {
+                SEEN_NONCES.remove(entry.getKey(), entry.getValue());
+            }
+        }
+        // prune the queue of dropped entries, else it leaks a string per accepted message
+        NONCE_ORDER.removeIf(nonce -> !SEEN_NONCES.containsKey(nonce));
     }
 }

@@ -1,0 +1,6 @@
+name: MikeyCore
+version: '${version}'
+main: mikey.me.core.MikeyCorePlugin
+api-version: '1.21'
+load: STARTUP
+folia-supported: true

@@ -46,4 +46,30 @@ class PluginProtocolTest {
         assertEquals(PAYLOAD, PluginProtocol.unwrap(PluginProtocol.CH_STAFFCHAT, spaced, SECRET).orElseThrow());
         assertTrue(PluginProtocol.unwrap(PluginProtocol.CH_STAFFCHAT, spaced, SECRET).isEmpty());
     }
+
+    // nonce cache used to scan everything and drop new msgs at capacity, server lost all traffic
+    @Test
+    void keepsWorkingPastTheNonceCacheLimit() {
+        String secret = "cache-pressure";
+        int accepted = 0;
+        int total = 12_000;
+        for (int i = 0; i < total; i++) {
+            String envelope = PluginProtocol.wrap(PluginProtocol.CH_STAFFCHAT,
+                    "{\"n\":" + i + "}", secret).orElseThrow();
+            if (PluginProtocol.unwrap(PluginProtocol.CH_STAFFCHAT, envelope, secret).isPresent()) {
+                accepted++;
+            }
+        }
+        assertTrue(accepted > total / 2,
+                "most messages should still be accepted past the cache limit, got " + accepted + "/" + total);
+    }
+
+    // replayed msg must stay rejected while cached, eviction cant be an anti-replay bypass
+    @Test
+    void stillRejectsReplayOfAnAcceptedEnvelope() {
+        String secret = "replay-after-eviction";
+        String envelope = PluginProtocol.wrap(PluginProtocol.CH_BAN_NOTIFY, PAYLOAD, secret).orElseThrow();
+        assertTrue(PluginProtocol.unwrap(PluginProtocol.CH_BAN_NOTIFY, envelope, secret).isPresent());
+        assertTrue(PluginProtocol.unwrap(PluginProtocol.CH_BAN_NOTIFY, envelope, secret).isEmpty());
+    }
 }
