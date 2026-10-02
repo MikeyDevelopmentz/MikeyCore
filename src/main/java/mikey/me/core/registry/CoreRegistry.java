@@ -32,6 +32,11 @@ public final class CoreRegistry {
         return root;
     }
 
+    // plugins/MikeyCore/database.yml, not a per-plugin folder
+    public static DatabaseConfig database(String poolName) throws IOException {
+        return new PluginData("core", root).database(poolName);
+    }
+
     // folder is plugins/MikeyCore/<id>
     public static PluginData register(String id) {
         if (id == null || !id.matches("[a-z0-9_-]+")) {

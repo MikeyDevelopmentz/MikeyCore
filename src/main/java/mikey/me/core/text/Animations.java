@@ -143,16 +143,18 @@ public final class Animations {
         }
         StringBuilder out = new StringBuilder();
         int index = 0;
-        for (int i = 0; i < inner.length() && index < shown; i++) {
+        for (int i = 0; i < inner.length() && index < shown; ) {
             if (format(inner, i)) {
                 out.append(inner, i, i + 2);
-                i++;
+                i += 2;
                 continue;
             }
-            out.append(inner.charAt(i));
-            if (inner.charAt(i) != '\n') {
+            int codePoint = inner.codePointAt(i);
+            out.appendCodePoint(codePoint);
+            if (codePoint != '\n') {
                 index++;
             }
+            i += Character.charCount(codePoint);
         }
         return out.toString();
     }
@@ -162,6 +164,13 @@ public final class Animations {
         String loop = " ".repeat(width) + inner + " ".repeat(width);
         int start = Math.floorMod(tick, Math.max(1, inner.length() + width));
         int end = Math.min(loop.length(), start + width);
+        // dont cut an emoji in half
+        if (start < loop.length() && Character.isLowSurrogate(loop.charAt(start))) {
+            start--;
+        }
+        if (end > start && end <= loop.length() && Character.isHighSurrogate(loop.charAt(end - 1))) {
+            end--;
+        }
         return loop.substring(start, end);
     }
 
@@ -196,25 +205,28 @@ public final class Animations {
         StringBuilder out = new StringBuilder(text.length());
         boolean on = false;
         int index = 0;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == '&' && i + 1 < text.length()) {
+        for (int i = 0; i < text.length(); ) {
+            char c = text.charAt(i);
+            if (c == '&' && i + 1 < text.length()) {
                 char code = text.charAt(i + 1);
                 if (code == 'u' || code == 'U') {
                     on = true;
-                    i++;
+                    i += 2;
                     continue;
                 }
                 if (LEGACY.indexOf(Character.toLowerCase(code)) >= 0) {
                     on = false;
                 }
             }
-            if (text.charAt(i) == '<') {
+            if (c == '<') {
                 on = false;
             }
-            if (on && text.charAt(i) != '\n') {
+            int codePoint = text.codePointAt(i);
+            if (on && codePoint != '\n') {
                 out.append(amp(hue(tick, index++)));
             }
-            out.append(text.charAt(i));
+            out.appendCodePoint(codePoint);
+            i += Character.charCount(codePoint);
         }
         return out.toString();
     }

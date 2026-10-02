@@ -28,6 +28,15 @@ class CoreRegistryTest {
     }
 
     @Test
+    void rootDatabaseFileSitsNextToThePluginFolder() throws Exception {
+        CoreRegistry.init(dir);
+        DatabaseConfig database = CoreRegistry.database("MikeyCore");
+        assertTrue(Files.exists(dir.resolve("database.yml")));
+        assertEquals("MikeyCore", database.poolName());
+        assertTrue(database.jdbcUrl().startsWith("jdbc:mysql://"));
+    }
+
+    @Test
     void rejectsABadId() {
         CoreRegistry.init(dir);
         assertThrows(IllegalArgumentException.class, () -> CoreRegistry.register("../nope"));

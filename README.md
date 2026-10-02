@@ -10,6 +10,7 @@ whats in it (`mikey.me.core`):
 - `registry.CoreRegistry` `init` sets `plugins/MikeyCore`. `register("staff")` makes `plugins/MikeyCore/staff/` and `database()` reads `database.yml` in that folder
 - `persistence.YamlFile` reads and writes a plain yaml file (maps, lists, numbers, bools). no bukkit. `read` on a missing file is an empty map
 - `persistence.DatabaseConfig` db settings record, `toString` hides the password
+- `persistence.DatabasePool` hikari pool from that config. `connection()` borrows one, `close()` stops it. the plugin opens `plugins/MikeyCore/database.yml` on enable and closes it on disable. no mysql just means nothing connects until something asks
 - `persistence.ActivePunishmentPolicy` checks if a ban/mute is still active from its start time and duration
 - `world.WorldPoint` a world name plus x y z. `within` uses a show distance and a bigger hide distance so stuff doesnt flicker on the edge
 - `text.Lines` add/set/remove on a list of strings. line numbers are 1-based, a bad one comes back empty

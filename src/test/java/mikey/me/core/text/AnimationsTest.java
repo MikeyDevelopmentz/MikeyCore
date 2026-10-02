@@ -40,4 +40,13 @@ class AnimationsTest {
         String frame = Animations.frame("<#ANIM:wave:&f,&c>" + emoji + "a</#ANIM>", 0);
         assertTrue(frame.contains(emoji), frame);
     }
+
+    @Test
+    void otherAnimsKeepSurrogatePairsTogether() {
+        String emoji = "\uD83D\uDE00";
+        String typed = Animations.frame("<#ANIM:typewriter>" + emoji + "a</#ANIM>", 1);
+        String rainbow = Animations.frame("&u" + emoji, 0);
+        assertTrue(typed.contains(emoji), typed);
+        assertTrue(rainbow.contains(emoji), rainbow);
+    }
 }

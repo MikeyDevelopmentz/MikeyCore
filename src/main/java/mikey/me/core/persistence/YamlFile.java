@@ -262,10 +262,10 @@ public final class YamlFile {
             Double.parseDouble(text);
             return true;
         } catch (NumberFormatException e) {
-            // parseDouble rejects hex/octal/binary but yaml 1.1 accepts them, quote anything not plain decimal
-            return !HEX.matcher(text).matches()
-                    && !NON_DECIMAL.matcher(text).matches()
-                    && !SEXAGESIMAL.matcher(text).matches();
+            // parseDouble rejects hex/octal/binary but yaml 1.1 accepts them, quote those too
+            return HEX.matcher(text).matches()
+                    || NON_DECIMAL.matcher(text).matches()
+                    || SEXAGESIMAL.matcher(text).matches();
         }
     }
 

@@ -206,6 +206,20 @@ class YamlFileTest {
         assertFalse(YamlFile.bool(back, "g", false));
     }
 
+    @Test
+    void quotesYaml11Numbers() throws Exception {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("hex", "0x1F");
+        root.put("sex", "1:30:00");
+        Path file = dir.resolve("yaml11.yml");
+        YamlFile.write(file, root);
+        String raw = Files.readString(file);
+        assertTrue(raw.contains("'0x1F'") || raw.contains("\"0x1F\""), raw);
+        assertTrue(raw.contains("'1:30:00'") || raw.contains("\"1:30:00\""), raw);
+        assertEquals("0x1F", YamlFile.read(file).get("hex"));
+        assertEquals("1:30:00", YamlFile.read(file).get("sex"));
+    }
+
     private static void writeQuietly(Path file, Map<String, Object> content) {
         try {
             YamlFile.write(file, content);
