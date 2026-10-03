@@ -12,7 +12,8 @@ whats in it (`mikey.me.core`):
 - `persistence.DatabaseConfig` db settings record, `toString` hides the password
 - `persistence.DatabasePool` hikari pool from that config. `connection()` borrows one, `close()` stops it. the plugin opens `plugins/MikeyCore/database.yml` on enable and closes it on disable. no mysql just means nothing connects until something asks
 - `persistence.ActivePunishmentPolicy` checks if a ban/mute is still active from its start time and duration
-- `web.WebServer` tiny http server. `start(port, token)` binds, `route(method, path, handler)` adds a route, `stop()` closes it. empty token stays on 127.0.0.1. a token listens on every interface and has to be sent as `Authorization: Bearer`, `X-Token`, or `?token=`. no extra deps, jdk http server
+- `web.WebServer` tiny http server. `start(port, token)` binds, `route(method, path, handler)` adds a route, `html(path, body)` serves a page, `stop()` closes it. empty token stays on 127.0.0.1. a token listens on every interface and has to be sent as `Authorization: Bearer`, `X-Token`, or `?token=`. no extra deps, jdk http server
+- `web.WebApps` the one shared server. `open(plugins/MikeyCore/web.yml)` starts it when `enabled` is true. another plugin calls `register(id, server -> ...)` and `unregister(id)`. same id replaces just that plugin's routes. `web.WebFiles.text` reads a classpath page. `web.Json` parses a json body
 - `world.WorldPoint` a world name plus x y z. `within` uses a show distance and a bigger hide distance so stuff doesnt flicker on the edge
 - `text.Lines` add/set/remove on a list of strings. line numbers are 1-based, a bad one comes back empty
 - `text.Placeholders` `contains` / `any` for a `%placeholder%` token. `100%` and `%%` dont count

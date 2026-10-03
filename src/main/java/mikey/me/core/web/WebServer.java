@@ -20,6 +20,7 @@ public final class WebServer {
     private final byte[] token;
     private final boolean localOnly;
     private final CopyOnWriteArrayList<Route> routes = new CopyOnWriteArrayList<>();
+    private final ThreadLocal<String> routeOwner = new ThreadLocal<>();
     private volatile boolean stopped;
 
     private WebServer(HttpServer server, ExecutorService executor, byte[] token, boolean localOnly) {
@@ -54,7 +55,35 @@ public final class WebServer {
     public void route(String method, String path, WebHandler handler) {
         boolean prefix = path.endsWith("*");
         String clean = prefix ? path.substring(0, path.length() - 1) : path;
-        routes.add(new Route(method.toUpperCase(Locale.ROOT), clean, prefix, handler));
+        String owner = routeOwner.get();
+        routes.add(new Route(owner == null ? "" : owner, method.toUpperCase(Locale.ROOT), clean, prefix, handler));
+    }
+
+    public void html(String path, String body) {
+        String page = body == null ? "" : body;
+        route("GET", path, exchange -> exchange.html(200, page));
+    }
+
+    // routes added inside here belong to that plugin, so a reload can drop just those
+    void bind(String owner, Runnable add) {
+        String prev = routeOwner.get();
+        routeOwner.set(owner == null ? "" : owner);
+        try {
+            add.run();
+        } finally {
+            if (prev == null) {
+                routeOwner.remove();
+            } else {
+                routeOwner.set(prev);
+            }
+        }
+    }
+
+    void drop(String owner) {
+        if (owner == null) {
+            return;
+        }
+        routes.removeIf(route -> owner.equals(route.owner));
     }
 
     public void stop() {
@@ -169,6 +198,6 @@ public final class WebServer {
         return prefix;
     }
 
-    private record Route(String method, String path, boolean prefix, WebHandler handler) {
+    private record Route(String owner, String method, String path, boolean prefix, WebHandler handler) {
     }
 }
