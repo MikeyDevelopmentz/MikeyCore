@@ -32,20 +32,25 @@ public final class WebServer {
 
     // empty token stays on localhost. dont open the editor on every interface with no token
     public static WebServer start(int port, String token) throws IOException {
+        String secret = token == null ? "" : token.trim();
+        return listen(port, secret, secret.isEmpty());
+    }
+
+    // localOnly false and an empty secret is the public bind. player tokens live on WebApps
+    static WebServer listen(int port, String token, boolean localOnly) throws IOException {
         if (port < 0 || port > 65535) {
             throw new IOException("bad port " + port);
         }
         String secret = token == null ? "" : token.trim();
-        boolean local = secret.isEmpty();
         // bytes, not a hostname, so this stays ipv4 and doesnt flip to the ipv6 wildcard
-        byte[] addr = local ? new byte[] {127, 0, 0, 1} : new byte[] {0, 0, 0, 0};
+        byte[] addr = localOnly ? new byte[] {127, 0, 0, 1} : new byte[] {0, 0, 0, 0};
         HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getByAddress(addr), port), 0);
         ExecutorService executor = Executors.newCachedThreadPool(task -> {
             Thread thread = new Thread(task, "mikey-web");
             thread.setDaemon(true);
             return thread;
         });
-        WebServer web = new WebServer(server, executor, secret.getBytes(StandardCharsets.UTF_8), local);
+        WebServer web = new WebServer(server, executor, secret.getBytes(StandardCharsets.UTF_8), localOnly);
         server.createContext("/", web::handle);
         server.setExecutor(executor);
         server.start();
@@ -152,7 +157,8 @@ public final class WebServer {
     }
 
     private boolean allowed(HttpExchange exchange) {
-        if (token.length == 0) {
+        // blank web.yml token. public bind still needs a player token
+        if (localOnly) {
             return true;
         }
         String authorization = exchange.getRequestHeaders().getFirst("Authorization");
@@ -176,10 +182,15 @@ public final class WebServer {
     }
 
     private boolean matches(String got) {
-        if (got == null) {
+        if (got == null || got.isEmpty()) {
             return false;
         }
-        return MessageDigest.isEqual(token, got.getBytes(StandardCharsets.UTF_8));
+        byte[] raw = got.getBytes(StandardCharsets.UTF_8);
+        // direct start() secret. player tokens are separate and recheck the player
+        if (token.length > 0 && MessageDigest.isEqual(token, raw)) {
+            return true;
+        }
+        return WebApps.accept(raw);
     }
 
     private Route find(String method, String path) {
